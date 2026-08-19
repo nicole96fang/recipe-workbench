@@ -11,19 +11,27 @@
 }
 
 :root {
+  /* ===== 严格采用指定配色 ===== */
   --blue: #4ba7ca;        /* 主色 浅蓝 */
-  --blue-deep: #2f829f;
-  --blue-soft: #7fc0db;
-  --pink: #ffb6c1;         /* 辅色 粉色 */
-  --pink-deep: #f48fa3;
-  --pink-soft: #ffdce3;
-  --cream: #fbfaf7;        /* 暖奶白底，不灰不割裂 */
-  --cream-2: #fff2f5;      /* 淡粉底 */
-  --ink: #3a4f58;          /* 深蓝灰文字，比纯黑柔和 */
-  --ink-soft: #7d8f97;
+  --blue-deep: #2f829f;   /* 浅蓝深一档（文字/强调） */
+  --blue-soft: #7fc0db;   /* 浅蓝浅一档 */
+  --blue-tint: #d9eef5;   /* 浅蓝极浅（底/卡片） */
+  --blue-wash: #eaf6fa;   /* 浅蓝水洗（底） */
+
+  --pink: #ffb6c1;        /* 辅色 粉色 */
+  --pink-deep: #f48fa3;   /* 粉色深一档 */
+  --pink-soft: #ffd0d9;   /* 粉色浅一档 */
+  --pink-tint: #ffe3e9;   /* 粉色极浅（底/卡片） */
+  --pink-wash: #fff0f3;   /* 粉色水洗（底） */
+
+  --cream: #fbfdff;       /* 极浅奶白底（偏蓝一点点，不灰） */
+  --cream-2: #fff0f3;     /* 淡粉底 */
+  --ink: #2f6076;         /* 深蓝灰文字（由浅蓝压深，比纯黑柔和） */
+  --ink-soft: #6f93a3;    /* 浅一档说明文字 */
   --white: #ffffff;
-  --shadow: 0 10px 26px rgba(75, 167, 202, 0.20);
-  --shadow-sm: 0 6px 14px rgba(75, 167, 202, 0.16);
+
+  --shadow: 0 10px 26px rgba(75, 167, 202, 0.22);
+  --shadow-sm: 0 6px 14px rgba(75, 167, 202, 0.18);
   --r-lg: 28px;
   --r-md: 20px;
   --r-sm: 14px;
@@ -36,7 +44,7 @@
   --plum-soft: var(--blue-soft);
   --mint: var(--pink);
   --mint-deep: var(--pink-deep);
-  --mint-soft: var(--pink-soft);
+  --mint-soft: var(--pink-tint);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -45,9 +53,9 @@ body {
   font-family: var(--cn-font);
   color: var(--ink);
   background:
-    radial-gradient(1200px 600px at 80% -10%, var(--pink-soft) 0%, transparent 60%),
-    radial-gradient(900px 500px at 0% 110%, var(--blue) 0%, transparent 48%),
-    linear-gradient(160deg, var(--cream) 0%, #f3f9fb 100%);
+    radial-gradient(1200px 600px at 80% -10%, var(--pink-tint) 0%, transparent 60%),
+    radial-gradient(900px 500px at 0% 110%, var(--blue-tint) 0%, transparent 50%),
+    linear-gradient(160deg, var(--blue-wash) 0%, var(--pink-wash) 100%);
   background-attachment: fixed;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
@@ -76,9 +84,9 @@ body {
   position: sticky; top: 0; z-index: 30;
   display: flex; align-items: center; gap: 8px;
   padding: 11px 12px;
-  background: rgba(251, 246, 242, 0.88);
+  background: rgba(251, 253, 255, 0.88);
   backdrop-filter: blur(14px);
-  border-bottom: 2px solid rgba(167, 204, 207, 0.5);
+  border-bottom: 2px solid rgba(75, 167, 202, 0.35);
 }
 .icon-btn {
   border: none; background: var(--mint); color: var(--plum-deep);
@@ -112,7 +120,7 @@ body {
   transform: translateX(-110%);
   transition: transform .28s cubic-bezier(.4,0,.2,1);
   display: flex; flex-direction: column;
-  box-shadow: 12px 0 30px rgba(94, 56, 80, .35);
+  box-shadow: 12px 0 30px rgba(75, 167, 202, .45);
 }
 #sidebar.open { transform: translateX(0); }
 .sidebar-head {
@@ -198,10 +206,10 @@ body {
   border-radius: 999px; padding: 3px 9px; font-family: var(--en-font);
 }
 /* 让分类卡片颜色交替柔和 */
-.cat-card:nth-child(4n+1) { background: linear-gradient(160deg,#fff,#fdeef0); }
-.cat-card:nth-child(4n+2) { background: linear-gradient(160deg,#fff,#eef6f6); }
-.cat-card:nth-child(4n+3) { background: linear-gradient(160deg,#fff,#fbf1f5); }
-.cat-card:nth-child(4n)   { background: linear-gradient(160deg,#fff,#eaf4f4); }
+.cat-card:nth-child(4n+1) { background: linear-gradient(160deg,#fff,var(--pink-wash)); }
+.cat-card:nth-child(4n+2) { background: linear-gradient(160deg,#fff,var(--blue-wash)); }
+.cat-card:nth-child(4n+3) { background: linear-gradient(160deg,#fff,var(--pink-tint)); }
+.cat-card:nth-child(4n)   { background: linear-gradient(160deg,#fff,var(--blue-tint)); }
 
 /* 分类头部 */
 .cat-header { display: flex; align-items: center; gap: 14px; margin: 4px 0 16px; }
@@ -225,8 +233,8 @@ body {
   border: 2px solid var(--mint);
 }
 .big-btn.danger-ghost {
-  background: var(--white); color: #c0506a;
-  border: 2px solid #f0c0cc;
+  background: var(--white); color: var(--pink-deep);
+  border: 2px solid var(--pink-soft);
 }
 .add-recipe-btn { margin-bottom: 18px; }
 
@@ -326,14 +334,14 @@ body {
 /* ============ 弹层 ============ */
 .modal-mask {
   position: fixed; inset: 0; z-index: 60;
-  background: rgba(94,56,80,.45); backdrop-filter: blur(4px);
+  background: rgba(47, 130, 159, .42); backdrop-filter: blur(4px);
   display: flex; align-items: flex-end; justify-content: center;
 }
 .modal-mask[hidden] { display: none; }
 .modal-card {
   background: var(--cream); width: 100%; max-width: 560px;
   border-radius: 30px 30px 0 0; padding: 24px 22px 28px;
-  box-shadow: 0 -10px 40px rgba(94,56,80,.3);
+  box-shadow: 0 -10px 40px rgba(75, 167, 202, .35);
   animation: slideup .28s ease;
 }
 @keyframes slideup { from { transform: translateY(40px); opacity: .6; } to { transform: none; opacity: 1; } }
@@ -395,12 +403,12 @@ body {
   .view { display: none !important; }
   .view.view-recipe { display: block !important; }
   .recipe-sheet {
-    box-shadow: none !important; border: 2px solid #e7d9e0; border-radius: 12px;
+    box-shadow: none !important; border: 2px solid var(--blue-tint); border-radius: 12px;
     padding: 22px 24px !important; max-width: 100% !important;
   }
-  .rs-photo-wrap { background: #f3f0f2 !important; }
-  .rs-ingredients li { background: #faf4f6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .rs-photo-wrap { background: var(--pink-wash) !important; }
+  .rs-ingredients li { background: var(--pink-tint) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .rs-step-num { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .recipe-sheet h2.rs-title, .rs-section-title { color: #7d4c69 !important; }
+  .recipe-sheet h2.rs-title, .rs-section-title { color: var(--blue) !important; }
   .rs-section-title { margin-top: 18px !important; }
 }
