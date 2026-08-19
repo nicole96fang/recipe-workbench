@@ -2,6 +2,19 @@
   "recipes": {
     "chicken": [
       {
+        "id": "mszrjoyyg1kpq",
+        "name": "云端测试·蜜汁鸡翅",
+        "desc": "测试永久保存",
+        "photo": "__cloud__:mszrjoyyg1kpq",
+        "ingredients": [
+          ""
+        ],
+        "steps": [
+          ""
+        ],
+        "created": 1787124100138
+      },
+      {
         "id": "mszriv93j3dgi",
         "name": "云端测试·蜜汁鸡翅",
         "desc": "测试永久保存",
@@ -29,8 +42,8 @@
       }
     ]
   },
-  "coins": 10,
-  "petXp": 10,
+  "coins": 15,
+  "petXp": 15,
   "lastTip": "",
   "knowPhotos": {}
 }
