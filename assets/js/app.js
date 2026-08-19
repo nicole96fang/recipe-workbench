@@ -1,0 +1,398 @@
+/* ===================== 主应用 ===================== */
+(function () {
+  "use strict";
+  const { CATEGORIES, KNOWLEDGE, PET_STAGES } = window.APP_DATA;
+
+  /* ---------- 存储 ---------- */
+  const STORE_KEY = "fangbao_recipe_app_v1";
+  let state = load();
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(STORE_KEY));
+      if (s && s.recipes) return s;
+    } catch (e) {}
+    return { recipes: {}, coins: 0, petXp: 0, lastTip: "", knowPhotos: {} };
+  }
+  function save() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  /* ---------- 工具 ---------- */
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function toast(msg) {
+    const t = $("#toast"); t.textContent = msg; t.hidden = false;
+    clearTimeout(t._t); t._t = setTimeout(() => (t.hidden = true), 1600);
+  }
+  function esc(s) { return (s || "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+
+  /* ---------- 积分 / 宠物 ---------- */
+  function addCoins(n) { state.coins += n; state.petXp += n; updatePet(); save(); }
+  function petInfo() {
+    let cur = PET_STAGES[0];
+    for (const s of PET_STAGES) if (state.petXp >= s.min) cur = s;
+    const next = PET_STAGES.find(s => s.min > cur.min);
+    let pct = 100;
+    if (next) pct = Math.round(((state.petXp - cur.min) / (next.min - cur.min)) * 100);
+    return { ...cur, pct, next };
+  }
+  function updatePet() {
+    const p = petInfo();
+    $("#coin-count").textContent = state.coins;
+    $("#pet-emoji").textContent = p.emoji;
+    $("#pet-avatar").textContent = p.emoji;
+    $("#pet-level").textContent = "Lv." + (PET_STAGES.indexOf(p) + 1);
+    $("#pet-stage").textContent = p.stage;
+    $("#pet-bar-fill").style.width = p.pct + "%";
+    $("#pet-tip").textContent = p.next
+      ? `再攒 ${p.next.min - state.petXp} 积分，小厨神进化成「${p.next.stage}」`
+      : "已封神！你是真正的厨神芳宝 👑";
+  }
+
+  /* ---------- 视图切换 ---------- */
+  const views = { home: "#view-home", cat: "#view-cat", recipe: "#view-recipe", knowledge: "#view-knowledge" };
+  let curCat = null, curRecipe = null;
+  function showView(name) {
+    Object.values(views).forEach(v => $(v).classList.remove("active"));
+    $(views[name]).classList.add("active");
+    window.scrollTo(0, 0);
+  }
+
+  /* ---------- 侧边栏 ---------- */
+  $("#menu-btn").addEventListener("click", () => $("#sidebar").classList.toggle("open"));
+  $$(".nav-item").forEach(it =>
+    it.addEventListener("click", () => {
+      $$(".nav-item").forEach(n => n.classList.remove("active"));
+      it.classList.add("active");
+      $("#sidebar").classList.remove("open");
+      const v = it.dataset.view;
+      if (v === "knowledge") renderKnowledge(), showView("knowledge");
+      else showView("home");
+    })
+  );
+
+  /* ---------- 首页：13 分类卡片 ---------- */
+  function renderHome() {
+    const grid = $("#cat-grid");
+    grid.innerHTML = "";
+    CATEGORIES.forEach(c => {
+      const n = state.recipes[c.id] ? state.recipes[c.id].length : 0;
+      const card = document.createElement("div");
+      card.className = "cat-card";
+      card.style.background = `linear-gradient(160deg,#fff,${c.tint})`;
+      card.innerHTML = `
+        ${n ? `<span class="cat-badge">${n}</span>` : ""}
+        <span class="cat-emoji">${c.emoji}</span>
+        <div class="cat-name">${c.name}</div>`;
+      card.addEventListener("click", () => openCat(c.id));
+      grid.appendChild(card);
+    });
+  }
+
+  /* ---------- 分类页 ---------- */
+  function openCat(id) {
+    curCat = id;
+    const c = CATEGORIES.find(x => x.id === id);
+    $("#cat-emoji").textContent = c.emoji;
+    $("#cat-title").textContent = c.name;
+    renderRecipeList();
+    showView("cat");
+  }
+  function renderRecipeList() {
+    const c = CATEGORIES.find(x => x.id === curCat);
+    const list = state.recipes[curCat] || [];
+    $("#cat-count").textContent = list.length + " 个食谱";
+    const box = $("#recipe-list");
+    box.innerHTML = "";
+    $("#recipe-empty").style.display = list.length ? "none" : "block";
+    list.forEach(r => {
+      const item = document.createElement("div");
+      item.className = "recipe-item";
+      const thumb = r.photo
+        ? `<img class="recipe-thumb" src="${r.photo}" alt="">`
+        : `<div class="recipe-thumb empty">${c.emoji}</div>`;
+      item.innerHTML = `${thumb}
+        <div class="recipe-meta">
+          <h4>${esc(r.name)}</h4>
+          <p>${esc(r.desc || "点开看看做法吧～")}</p>
+        </div>
+        <div class="recipe-go">›</div>`;
+      item.addEventListener("click", () => openRecipe(r.id));
+      box.appendChild(item);
+    });
+    renderHome();
+  }
+
+  /* ---------- 新增食谱弹层 ---------- */
+  let editingId = null;
+  $("#add-recipe-btn").addEventListener("click", () => openModal(null));
+  $("#modal-cancel").addEventListener("click", closeModal);
+  $("#recipe-modal").addEventListener("click", e => { if (e.target.id === "recipe-modal") closeModal(); });
+  function openModal(id) {
+    editingId = id;
+    $("#modal-title").textContent = id ? "编辑食谱名字" : "加入新食谱";
+    $("#f-name").value = id ? (state.recipes[curCat].find(r=>r.id===id)||{}).name || "" : "";
+    $("#f-desc").value = id ? (state.recipes[curCat].find(r=>r.id===id)||{}).desc || "" : "";
+    $("#recipe-modal").hidden = false;
+    setTimeout(() => $("#f-name").focus(), 50);
+  }
+  function closeModal() { $("#recipe-modal").hidden = true; editingId = null; }
+  $("#modal-save").addEventListener("click", () => {
+    const name = $("#f-name").value.trim();
+    if (!name) { toast("给食谱起个名字吧 🍯"); return; }
+    const desc = $("#f-desc").value.trim();
+    if (!state.recipes[curCat]) state.recipes[curCat] = [];
+    if (editingId) {
+      const r = state.recipes[curCat].find(x => x.id === editingId);
+      r.name = name; r.desc = desc;
+    } else {
+      state.recipes[curCat].unshift({
+        id: uid(), name, desc,
+        photo: "", ingredients: [""], steps: [""], created: Date.now()
+      });
+      addCoins(5); toast("+5 积分 🎉 新食谱已加入");
+    }
+    save(); closeModal(); renderRecipeList();
+  });
+
+  /* ---------- 食谱详情 ---------- */
+  function openRecipe(id) {
+    curRecipe = id;
+    renderRecipe();
+    showView("recipe");
+  }
+  function getRecipe() {
+    return (state.recipes[curCat] || []).find(r => r.id === curRecipe);
+  }
+  let editMode = false;
+  function renderRecipe() {
+    const r = getRecipe();
+    if (!r) return;
+    const c = CATEGORIES.find(x => x.id === curCat);
+    const sheet = $("#recipe-sheet");
+    const photo = r.photo
+      ? `<img class="rs-photo" src="${r.photo}" alt="成品图">`
+      : `<div class="rs-photo empty">${c.emoji}</div>`;
+
+    let ings = (r.ingredients || []).map((g, i) =>
+      `<li>${esc(g || "—")}</li>`).join("") || `<li>还没有写材料哦</li>`;
+    let steps = (r.steps || []).map((s, i) =>
+      `<div class="rs-step"><div class="rs-step-num">${i + 1}</div><div class="rs-step-text">${esc(s || "")}</div></div>`
+    ).join("") || `<div class="rs-step-text">还没有写步骤，点下面的按钮加上吧～</div>`;
+
+    const editBtn = '<button class="big-btn ghost rs-edit-toggle" id="edit-recipe-btn" style="margin-bottom:14px">✏️ 编辑材料 / 步骤 / 照片</button>';
+    sheet.innerHTML = `
+      <h2 class="rs-title">${esc(r.name)}</h2>
+      ${r.desc ? `<p class="rs-desc">${esc(r.desc)}</p>` : ""}
+      <div class="rs-photo-wrap">${photo}</div>
+      ${editBtn}
+      ${editMode ? editControls(r) : ""}
+      <div class="rs-section-title">材料</div>
+      <ul class="rs-ingredients">${ings}</ul>
+      <div class="rs-section-title">步骤</div>
+      <div class="rs-steps">${steps}</div>
+    `;
+    $("#edit-recipe-btn").addEventListener("click", () => { editMode = !editMode; renderRecipe(); });
+    bindRecipeEdit(r);
+  }
+
+  function editControls(r) {
+    const ings = (r.ingredients || []).map((g, i) =>
+      `<div class="row-inline"><input data-ing="${i}" value="${esc(g)}" placeholder="材料 ${i+1}"><button class="rs-edit-btn" data-del-ing="${i}">✕</button></div>`
+    ).join("");
+    const steps = (r.steps || []).map((s, i) =>
+      `<div class="row-inline"><input data-step="${i}" value="${esc(s)}" placeholder="步骤 ${i+1}"><button class="rs-edit-btn" data-del-step="${i}">✕</button></div>`
+    ).join("");
+    return `
+      <div class="rs-edit-row">
+        <button class="rs-edit-btn" id="pick-photo">📷 选择 / 拍张成品照</button>
+        <input type="file" id="photo-file" accept="image/*" hidden>
+        <button class="rs-edit-btn" id="add-ing">＋ 加一行材料</button>
+        <button class="rs-edit-btn" id="add-step">＋ 加一步骤</button>
+      </div>
+      <div class="rs-edit-row" id="ing-box">${ings}</div>
+      <div class="rs-edit-row" id="step-box">${steps}</div>
+      <div class="rs-edit-row"><button class="big-btn" id="save-recipe-edit">💾 保存修改</button></div>`;
+  }
+
+  function bindRecipeEdit(r) {
+    if (!editMode) return;
+    $("#pick-photo").addEventListener("click", () => $("#photo-file").click());
+    $("#photo-file").addEventListener("change", e => {
+      const f = e.target.files[0]; if (!f) return;
+      const rd = new FileReader();
+      rd.onload = ev => {
+        r.photo = ev.target.result; save();
+        $(".rs-photo-wrap").innerHTML = `<img class="rs-photo" src="${r.photo}" alt="">`;
+        toast("照片已添加 📸");
+      };
+      rd.readAsDataURL(f);
+    });
+    $("#add-ing").addEventListener("click", () => { r.ingredients.push(""); save(); renderRecipe(); });
+    $("#add-step").addEventListener("click", () => { r.steps.push(""); save(); renderRecipe(); });
+    $$("[data-ing]").forEach(inp => inp.addEventListener("input", e => {
+      r.ingredients[+e.target.dataset.ing] = e.target.value; save();
+    }));
+    $$("[data-step]").forEach(inp => inp.addEventListener("input", e => {
+      r.steps[+e.target.dataset.step] = e.target.value; save();
+    }));
+    $$("[data-del-ing]").forEach(b => b.addEventListener("click", () => {
+      r.ingredients.splice(+b.dataset.delIng, 1); save(); renderRecipe();
+    }));
+    $$("[data-del-step]").forEach(b => b.addEventListener("click", () => {
+      r.steps.splice(+b.dataset.delStep, 1); save(); renderRecipe();
+    }));
+    $("#save-recipe-edit").addEventListener("click", () => {
+      editMode = false; save(); renderRecipe(); toast("已保存 ✅");
+    });
+  }
+
+  // 详情页操作：编辑 / 打印 / 删除
+  $("#print-btn").addEventListener("click", () => window.print());
+  $("#del-recipe-btn").addEventListener("click", () => {
+    if (!confirm("确定删除这个食谱吗？删除后无法恢复。")) return;
+    state.recipes[curCat] = state.recipes[curCat].filter(x => x.id !== curRecipe);
+    save(); renderRecipeList(); showView("cat"); toast("已删除");
+  });
+
+  // 返回按钮
+  $("#cat-back").addEventListener("click", () => showView("home"));
+  $("#recipe-back").addEventListener("click", () => { editMode = false; openCat(curCat); });
+  $("#know-back").addEventListener("click", () => showView("home"));
+
+  /* ---------- 知识页 ---------- */
+  function renderKnowledge() {
+    const tabs = $$(".know-tab");
+    if (!tabs.length) {
+      const groups = [...new Set(KNOWLEDGE.map(k => k.group))];
+      const tabBox = $("#know-tabs");
+      tabBox.innerHTML = "";
+      groups.forEach((g, i) => {
+        const t = document.createElement("button");
+        t.className = "know-tab" + (i === 0 ? " active" : "");
+        t.textContent = g; t.dataset.group = g;
+        t.addEventListener("click", () => {
+          $$(".know-tab").forEach(x => x.classList.remove("active"));
+          t.classList.add("active"); renderKnowCards(g);
+        });
+        tabBox.appendChild(t);
+      });
+    }
+    renderKnowCards($(".know-tab.active")?.dataset.group || KNOWLEDGE[0].group);
+  }
+  function renderKnowCards(group) {
+    const body = $("#know-body");
+    body.innerHTML = "";
+    KNOWLEDGE.filter(k => k.group === group).forEach(k => {
+      const photo = state.knowPhotos[k.name];
+      const imgHtml = photo
+        ? `<img class="know-card-img" src="${photo}" alt="${k.name}照片">`
+        : `<div class="know-card-img empty" data-name="${k.name}">
+             <div class="know-upload">
+               <div class="know-emoji">${k.emoji}</div>
+               <button class="rs-edit-btn know-up-btn" data-name="${k.name}">📷 上传照片</button>
+             </div>
+           </div>`;
+      const card = document.createElement("div");
+      card.className = "know-card";
+      card.innerHTML = `
+        ${imgHtml}
+        <div class="know-card-body">
+          <span class="know-card-tag">${k.group}</span>
+          <h3>${k.emoji} ${k.name}</h3>
+          <p><b>用法：</b>${k.use}</p>
+          <div class="health"><b>💚 健康小知识：</b>${k.health}</div>
+          ${photo ? `<button class="rs-edit-btn know-change" data-name="${k.name}">🔄 更换 / 删除照片</button>` : ""}
+        </div>`;
+      body.appendChild(card);
+    });
+    bindKnowUpload(group);
+  }
+  function bindKnowUpload(group) {
+    const hidden = $("#know-file-hidden");
+    if (!hidden) {
+      const inp = document.createElement("input");
+      inp.type = "file"; inp.id = "know-file-hidden";
+      inp.accept = "image/*"; inp.hidden = true;
+      document.body.appendChild(inp);
+      inp.addEventListener("change", e => {
+        const f = e.target.files[0]; if (!f) return;
+        const name = inp.dataset.name;
+        const rd = new FileReader();
+        rd.onload = ev => {
+          state.knowPhotos[name] = ev.target.result; save();
+          toast("照片已保存 📸");
+          renderKnowCards(group);
+        };
+        rd.readAsDataURL(f);
+      });
+    }
+    $$(".know-up-btn, .know-change").forEach(b =>
+      b.addEventListener("click", () => {
+        const name = b.dataset.name;
+        if (b.classList.contains("know-change")) {
+          const act = confirm("点「确定」更换照片，点「取消」删除当前照片。");
+          if (!act) {
+            delete state.knowPhotos[name]; save(); renderKnowCards(group);
+            toast("已删除照片"); return;
+          }
+        }
+        const hf = $("#know-file-hidden");
+        hf.dataset.name = name; hf.value = ""; hf.click();
+      })
+    );
+  }
+
+  /* ---------- 雪花飘落 ---------- */
+  function snow() {
+    const cv = $("#snow-canvas");
+    const ctx = cv.getContext("2d");
+    let w, h, flakes;
+    function resize() {
+      w = cv.width = innerWidth; h = cv.height = innerHeight;
+      const n = Math.min(80, Math.round(w / 10));
+      flakes = Array.from({ length: n }, () => ({
+        x: Math.random() * w, y: Math.random() * h,
+        r: 2 + Math.random() * 4.5,
+        s: 0.3 + Math.random() * 1.0,
+        d: Math.random() * Math.PI * 2,
+        drift: 0.5 + Math.random() * 0.9,
+        a: 0.5 + Math.random() * 0.4
+      }));
+    }
+    resize(); addEventListener("resize", resize);
+    function tick() {
+      ctx.clearRect(0, 0, w, h);
+      for (const f of flakes) {
+        f.y += f.s; f.d += 0.012;
+        f.x += Math.sin(f.d) * f.drift;
+        if (f.y > h + 8) { f.y = -10; f.x = Math.random() * w; }
+        if (f.x > w + 8) f.x = -8;
+        if (f.x < -8) f.x = w + 8;
+        // 柔光晕
+        const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r * 3);
+        g.addColorStop(0, "rgba(255,255,255," + f.a + ")");
+        g.addColorStop(0.4, "rgba(255,255,255," + (f.a * 0.5) + ")");
+        g.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, f.r * 3, 0, Math.PI * 2);
+        ctx.fill();
+        // 实心核
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, f.r * 0.7, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,255," + Math.min(1, f.a + 0.2) + ")";
+        ctx.fill();
+      }
+      requestAnimationFrame(tick);
+    }
+    tick();
+  }
+
+  /* ---------- 启动 ---------- */
+  renderHome();
+  updatePet();
+  showView("home");
+  snow();
+})();

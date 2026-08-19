@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#7d4c69" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍯</text></svg>" />
+<title>🍯 努力当厨师的芳宝</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+<!-- 雪花飘落画布 -->
+<canvas id="snow-canvas" aria-hidden="true"></canvas>
+
+<div id="app">
+  <!-- 顶部栏 -->
+  <header id="topbar">
+    <button id="menu-btn" class="icon-btn" aria-label="菜单">☰</button>
+    <div class="brand">
+      <span class="brand-logo">🍯</span>
+      <span class="brand-name">努力当厨师的芳宝</span>
+    </div>
+    <div class="topbar-right">
+      <div class="pet-chip" id="pet-chip" title="我的小厨神宠物">
+        <span id="pet-emoji">🐤</span>
+        <span class="pet-level" id="pet-level">Lv.1</span>
+      </div>
+      <div class="coin-chip" id="coin-chip" title="积分">
+        <span>⭐</span><span id="coin-count">0</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 侧边栏 -->
+  <nav id="sidebar">
+    <div class="sidebar-head">
+      <span class="sidebar-logo">🍯</span>
+      <span>芳宝的小厨房</span>
+    </div>
+    <ul class="nav-list">
+      <li class="nav-item active" data-view="home"><span class="nav-ico">🏠</span> 首页</li>
+      <li class="nav-item" data-view="knowledge"><span class="nav-ico">📖</span> 食材分类知识和照片</li>
+    </ul>
+    <div class="sidebar-foot">
+      <div class="pet-card">
+        <div class="pet-avatar" id="pet-avatar">🐤</div>
+        <div class="pet-info">
+          <div class="pet-name">小厨神 · <span id="pet-stage">雏鸟</span></div>
+          <div class="pet-bar"><div class="pet-bar-fill" id="pet-bar-fill"></div></div>
+          <div class="pet-tip" id="pet-tip">记录第一个食谱，唤醒小厨神吧～</div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 主内容 -->
+  <main id="main">
+    <!-- 首页视图 -->
+    <section class="view view-home active" id="view-home">
+      <div class="home-hero">
+        <h1>今天想做点什么呢？</h1>
+        <p class="hero-sub">13 类食材，无限食谱，陪你慢慢变成大厨 🍳</p>
+      </div>
+      <div class="cat-grid" id="cat-grid"><!-- 分类卡片注入 --></div>
+    </section>
+
+    <!-- 分类详情视图 -->
+    <section class="view view-cat" id="view-cat">
+      <button class="back-btn" id="cat-back">← 返回首页</button>
+      <div class="cat-header">
+        <span class="cat-header-emoji" id="cat-emoji">🍗</span>
+        <div>
+          <h2 id="cat-title">鸡肉</h2>
+          <p id="cat-count" class="cat-count">0 个食谱</p>
+        </div>
+      </div>
+      <button class="big-btn add-recipe-btn" id="add-recipe-btn">＋ 加入新食谱</button>
+      <div class="recipe-list" id="recipe-list"><!-- 食谱列表注入 --></div>
+      <div class="empty-hint" id="recipe-empty">还没有食谱哦，点上面的大按钮加入第一个吧 🍯</div>
+    </section>
+
+    <!-- 食谱详情视图 -->
+    <section class="view view-recipe" id="view-recipe">
+      <button class="back-btn" id="recipe-back">← 返回</button>
+      <div class="recipe-sheet" id="recipe-sheet"><!-- 食谱内容注入 --></div>
+      <div class="recipe-actions">
+        <button class="big-btn ghost" id="print-btn">🖨 打印 / 存为 A4</button>
+        <button class="big-btn danger-ghost" id="del-recipe-btn">🗑 删除食谱</button>
+      </div>
+    </section>
+
+    <!-- 知识页视图 -->
+    <section class="view view-knowledge" id="view-knowledge">
+      <button class="back-btn" id="know-back">← 返回首页</button>
+      <h2 class="know-title">📖 食材分类知识和照片</h2>
+      <p class="know-sub">水彩手绘 · 每种食材的名字、用法与健康小知识</p>
+      <div class="know-tabs" id="know-tabs"><!-- 分类标签 --></div>
+      <div class="know-body" id="know-body"><!-- 知识卡片注入 --></div>
+    </section>
+  </main>
+</div>
+
+<!-- 食谱编辑弹层 -->
+<div class="modal-mask" id="recipe-modal" hidden>
+  <div class="modal-card">
+    <h3 id="modal-title">加入新食谱</h3>
+    <label class="field">
+      <span>食谱名字</span>
+      <input type="text" id="f-name" placeholder="例如：蜜汁烤鸡翅" maxlength="40" />
+    </label>
+    <label class="field">
+      <span>一句话简介（可选）</span>
+      <input type="text" id="f-desc" placeholder="例如：外焦里嫩，小朋友最爱" maxlength="60" />
+    </label>
+    <div class="modal-actions">
+      <button class="big-btn ghost" id="modal-cancel">取消</button>
+      <button class="big-btn" id="modal-save">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 轻提示 -->
+<div class="toast" id="toast" hidden></div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/watercolor.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
