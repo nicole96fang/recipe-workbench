@@ -2,17 +2,17 @@
   "recipes": {
     "chicken": [
       {
-        "id": "mszrenzg92ojd",
+        "id": "mszrg4t8y7u81",
         "name": "云端测试·蜜汁鸡翅",
         "desc": "测试永久保存",
-        "photo": "__cloud__:mszrenzg92ojd",
+        "photo": "__cloud__:mszrg4t8y7u81",
         "ingredients": [
           ""
         ],
         "steps": [
           ""
         ],
-        "created": 1787123865580
+        "created": 1787123934044
       },
       {
         "id": "mszrb6gq46bbl",
