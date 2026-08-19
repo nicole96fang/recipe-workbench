@@ -1,2 +1,5 @@
 # 忽略内部目录
 .codebuddy/
+
+# 云端运行时备份（由 App 写入 GitHub 仓库，不进 git 历史）
+data/
