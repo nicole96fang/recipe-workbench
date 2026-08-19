@@ -15,6 +15,142 @@
   }
   function save() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+    scheduleCloudAuto();
+  }
+
+  /* ---------- GitHub 云端永久存储（防本地丢失） ---------- */
+  const CLOUD = {
+    owner: "nicole96fang",
+    repo: "recipe-workbench",
+    branch: "main",
+    dataPath: "data/backup.json",
+    photoDir: "data/photos"
+  };
+  const TOKEN_KEY = "fangbao_cloud_token";
+  const AUTO_KEY = "fangbao_cloud_auto";
+  function getToken() { return (localStorage.getItem(TOKEN_KEY) || "").trim(); }
+  function setToken(t) { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); }
+  function getAuto() { return localStorage.getItem(AUTO_KEY) === "1"; }
+  function setAuto(v) { localStorage.setItem(AUTO_KEY, v ? "1" : "0"); }
+
+  function b64EncodeUtf8(str) {
+    return btoa(unescape(encodeURIComponent(str)));
+  }
+  function b64DecodeUtf8(b64) {
+    return decodeURIComponent(escape(atob(b64)));
+  }
+  // 把整个 state（含照片）逐食谱照片存入独立文件，文本存 backup.json
+  async function putContent(path, content, sha, depth) {
+    depth = depth || 0;
+    const url = `https://api.github.com/repos/${CLOUD.owner}/${CLOUD.repo}/contents/${path}`;
+    const body = { message: "🍯 芳宝食谱云备份", content: b64EncodeUtf8(content), branch: CLOUD.branch };
+    if (sha) body.sha = sha;
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: { Authorization: "Bearer " + getToken(), "Content-Type": "application/json", "Accept": "application/vnd.github+json" },
+      body: JSON.stringify(body)
+    });
+    if (res.status === 409 && depth < 2) {
+      const fresh = await getSha(path);
+      return putContent(path, content, fresh, depth + 1);
+    }
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error(j.message || ("HTTP " + res.status));
+    }
+    return (await res.json()).content.sha;
+  }
+  async function getSha(path) {
+    const url = `https://api.github.com/repos/${CLOUD.owner}/${CLOUD.repo}/contents/${path}?ref=${CLOUD.branch}`;
+    const res = await fetch(url, { headers: { Authorization: "Bearer " + getToken(), "Accept": "application/vnd.github+json" } });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return (await res.json()).sha;
+  }
+  // 经 API 实时读取（避免 raw CDN 缓存延迟）
+  async function getContent(path) {
+    const url = `https://api.github.com/repos/${CLOUD.owner}/${CLOUD.repo}/contents/${path}?ref=${CLOUD.branch}`;
+    const res = await fetch(url, { headers: { Authorization: "Bearer " + getToken(), "Accept": "application/vnd.github+json" } });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const j = await res.json();
+    return b64DecodeUtf8(j.content);
+  }
+
+  let _cloudBusy = Promise.resolve();
+  async function saveToCloud() {
+    const token = getToken();
+    if (!token) { toast("请先在 ☁ 云同步 里填入 GitHub Token"); openCloud(); return; }
+    // 串行化，避免并发写导致冲突
+    _cloudBusy = _cloudBusy.then(() => _doSaveCloud(), () => {});
+    return _cloudBusy;
+  }
+  async function _doSaveCloud() {
+    toast("☁ 正在保存到云端…");
+    // 1) 照片单独存
+    const photoTasks = [];
+    for (const cid in state.recipes) {
+      for (const r of state.recipes[cid]) {
+        if (r.photo) photoTasks.push((async () => {
+          const p = `${CLOUD.photoDir}/${r.id}.txt`;
+          let sha = null; try { sha = await getSha(p); } catch (e) {}
+          await putContent(p, r.photo, sha);
+        })());
+      }
+    }
+    await Promise.all(photoTasks);
+    // 2) 文本数据（去掉大照片，仅存引用标记）
+    const textState = JSON.parse(JSON.stringify(state));
+    for (const cid in textState.recipes) for (const r of textState.recipes[cid]) {
+      r.photo = r.photo ? ("__cloud__:" + r.id) : "";
+    }
+    let sha = null; try { sha = await getSha(CLOUD.dataPath); } catch (e) {}
+    await putContent(CLOUD.dataPath, JSON.stringify(textState, null, 2), sha);
+    // 更新自动同步计时器基准
+    toast("✅ 已永久保存到 GitHub 云端");
+  }
+
+  // 经 raw 读取（公开只读，无需 token，跨设备/清缓存均可恢复）
+  async function fetchRaw(path, tries) {
+    tries = tries || 4;
+    for (let i = 0; i < tries; i++) {
+      try {
+        const res = await fetch(`https://raw.githubusercontent.com/${CLOUD.owner}/${CLOUD.repo}/${CLOUD.branch}/${path}`, { cache: "no-store" });
+        if (res.ok) return await res.text();
+      } catch (e) {}
+      if (i < tries - 1) await new Promise(r => setTimeout(r, 1200 * (i + 1)));
+    }
+    return null;
+  }
+  async function loadFromCloud(force) {
+    try {
+      const txt = await fetchRaw(CLOUD.dataPath);
+      if (!txt) return false;
+      const data = JSON.parse(txt);
+      if (!data || !data.recipes) return false;
+      // 还原照片引用
+      for (const cid in data.recipes) for (const r of data.recipes[cid]) {
+        if (typeof r.photo === "string" && r.photo.startsWith("__cloud__:")) {
+          const id = r.photo.split(":")[1];
+          try {
+            const pt = await fetchRaw(`${CLOUD.photoDir}/${id}.txt`);
+            if (pt) r.photo = pt;
+          } catch (e) { r.photo = ""; }
+        }
+      }
+      if (force || !state.recipes || Object.keys(state.recipes).length === 0) {
+        state = Object.assign({ recipes: {}, coins: 0, petXp: 0, lastTip: "", knowPhotos: {} }, data);
+        save();
+      }
+      return true;
+    } catch (e) { return false; }
+  }
+
+  let _autoTimer = null;
+  function scheduleCloudAuto() {
+    if (!getAuto() || !getToken()) return;
+    clearTimeout(_autoTimer);
+    _autoTimer = setTimeout(() => { saveToCloud().catch(() => {}); }, 2500);
   }
 
   /* ---------- 工具 ---------- */
@@ -390,9 +526,43 @@
     tick();
   }
 
+  /* ---------- 云同步设置弹层 ---------- */
+  function openCloud() { $("#cloud-modal").hidden = false; refreshCloudUI(); }
+  function closeCloud() { $("#cloud-modal").hidden = true; }
+  function refreshCloudUI() {
+    $("#cloud-token").value = getToken();
+    $("#cloud-auto").checked = getAuto();
+    $("#cloud-status").textContent = getToken()
+      ? "已连接 · 账号 " + CLOUD.owner
+      : "未连接：填入你的 GitHub Token 后即可永久保存到云端";
+    $("#cloud-hint").textContent = getAuto()
+      ? "自动同步：开（每次改动后自动备份）"
+      : "自动同步：关（请手动点「保存到云端」）";
+  }
+  $("#cloud-btn").addEventListener("click", () => { $("#sidebar").classList.remove("open"); openCloud(); });
+  $("#cloud-cancel").addEventListener("click", closeCloud);
+  $("#cloud-modal").addEventListener("click", e => { if (e.target.id === "cloud-modal") closeCloud(); });
+  $("#cloud-auto").addEventListener("change", e => setAuto(e.target.checked));
+  $("#cloud-save-cloud").addEventListener("click", () => {
+    setToken($("#cloud-token").value.trim());
+    refreshCloudUI();
+    saveToCloud().catch(e => toast("保存失败：" + e.message));
+  });
+  $("#cloud-restore").addEventListener("click", () => {
+    if (!getToken()) { toast("请先填入 Token"); return; }
+    loadFromCloud(true).then(ok => {
+      toast(ok ? "✅ 已从云端恢复" : "云端没有可恢复的数据");
+      if (ok) { renderHome(); updatePet(); }
+    });
+  });
+
   /* ---------- 启动 ---------- */
   renderHome();
   updatePet();
   showView("home");
   snow();
+  // 本地为空时自动从云端恢复（跨设备/清缓存不丢）
+  if (!state.recipes || Object.keys(state.recipes).length === 0) {
+    loadFromCloud(false).then(ok => { if (ok) { renderHome(); updatePet(); } });
+  }
 })();

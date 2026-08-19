@@ -51,6 +51,7 @@
           <div class="pet-tip" id="pet-tip">记录第一个食谱，唤醒小厨神吧～</div>
         </div>
       </div>
+      <button class="cloud-btn" id="cloud-btn">☁ 云同步 · 永久保存</button>
     </div>
   </nav>
 
@@ -122,6 +123,29 @@
 
 <!-- 轻提示 -->
 <div class="toast" id="toast" hidden></div>
+
+<!-- 云同步设置弹层 -->
+<div class="modal-mask" id="cloud-modal" hidden>
+  <div class="modal-card">
+    <h3>☁ 永久保存到云端</h3>
+    <p class="cloud-desc">把你的食谱和照片存进 GitHub 仓库 <b>nicole96fang/recipe-workbench</b>，跨设备、清缓存、隔天都不会丢。</p>
+    <label class="field">
+      <span>GitHub Token（仅存你本机，用于写入你自己的仓库）</span>
+      <input type="password" id="cloud-token" placeholder="ghp_xxxxxxxxxxxxxxxx" autocomplete="off" />
+    </label>
+    <label class="cloud-auto-row">
+      <input type="checkbox" id="cloud-auto" /> <span>自动同步（每次改动后自动备份到云端）</span>
+    </label>
+    <p class="cloud-status" id="cloud-status"></p>
+    <p class="cloud-hint" id="cloud-hint"></p>
+    <div class="modal-actions">
+      <button class="big-btn ghost" id="cloud-cancel">关闭</button>
+      <button class="big-btn" id="cloud-save-cloud">保存到云端</button>
+    </div>
+    <button class="big-btn ghost" id="cloud-restore">↺ 从云端恢复</button>
+    <p class="cloud-foot">获取 Token：GitHub → Settings → Developer settings → Personal access tokens → 勾选 <b>repo</b>。Token 只留在你浏览器本地，不会发给任何人。</p>
+  </div>
+</div>
 
 <script src="assets/js/data.js"></script>
 <script src="assets/js/watercolor.js"></script>
