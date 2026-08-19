@@ -2,32 +2,6 @@
   "recipes": {
     "chicken": [
       {
-        "id": "mszrm4sd0hh8n",
-        "name": "云端测试·蜜汁鸡翅",
-        "desc": "测试永久保存",
-        "photo": "__cloud__:mszrm4sd0hh8n",
-        "ingredients": [
-          ""
-        ],
-        "steps": [
-          ""
-        ],
-        "created": 1787124213949
-      },
-      {
-        "id": "mszriv93j3dgi",
-        "name": "云端测试·蜜汁鸡翅",
-        "desc": "测试永久保存",
-        "photo": "__cloud__:mszriv93j3dgi",
-        "ingredients": [
-          ""
-        ],
-        "steps": [
-          ""
-        ],
-        "created": 1787124061623
-      },
-      {
         "id": "mszrb6gq46bbl",
         "name": "云端测试·蜜汁鸡翅",
         "desc": "测试永久保存",
