@@ -34,7 +34,18 @@ python3 -m http.server 8123
 ```
 
 ## ☁ 部署
-纯静态站，可直接部署到任意静态托管（GitHub Pages / Vercel / Netlify / Cloudflare Pages）。
-本环境当前通过 Cloudflare Quick Tunnel 暴露到公网：
-`https://looksmart-configure-decent-printers.trycloudflare.com`
-（临时隧道，进程存活期间有效；正式使用建议绑定自有域名或静态托管。）
+- 永久公网地址（GitHub Pages）：**https://nicole96fang.github.io/recipe-workbench/**
+- 仓库：**https://github.com/nicole96fang/recipe-workbench**
+
+## 💾 数据永久保存（不会隔天不见）
+数据采用**本地 + 云端双保险**：
+- **本地**：localStorage 即时保存（关页不丢，离线可用）。
+- **云端（永久真源）**：点侧边栏底部「☁ 云同步 · 永久保存」，填入你的 GitHub Token（勾选 `repo` 权限），点「保存到云端」。
+  - 文本数据写入仓库 `data/backup.json`
+  - 每张照片写入 `data/photos/<id>.txt`
+  - 开启「自动同步」后，每次改动自动备份。
+- **跨设备 / 清缓存恢复**：打开 App 时若本地为空，会自动从云端（公开只读）恢复；也可点「↺ 从云端恢复」。
+- ⚠️ 注意：当前仓库为 **public**，云端备份（含照片）对任何人可见。若需隐私，请把仓库设为 private，或用私人 gist。
+
+> Token 只存在你浏览器本机 localStorage，不会发送给任何人；仅用于写入你自己的仓库。
+
