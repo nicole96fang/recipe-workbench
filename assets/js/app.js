@@ -14,7 +14,12 @@
     return { recipes: {}, coins: 0, petXp: 0, lastTip: "", knowPhotos: {} };
   }
   function save() {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+    catch (e) {
+      if (e && e.name === "QuotaExceededError") {
+        toast("⚠️ 本机空间已满，旧数据仍在，但刚改的可能没存。建议点☁云同步腾出空间～");
+      }
+    }
     scheduleCloudAuto();
   }
 
@@ -162,6 +167,30 @@
     clearTimeout(t._t); t._t = setTimeout(() => (t.hidden = true), 1600);
   }
   function esc(s) { return (s || "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+
+  /* 压缩图片：避免大图撑爆 localStorage（约 5MB 上限）导致保存失败、照片丢失 */
+  function compressImage(file, maxW, quality) {
+    maxW = maxW || 1100; quality = quality || 0.76;
+    return new Promise((resolve, reject) => {
+      const rd = new FileReader();
+      rd.onerror = reject;
+      rd.onload = () => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          let { width: w, height: h } = img;
+          if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+          const cv = document.createElement("canvas");
+          cv.width = w; cv.height = h;
+          cv.getContext("2d").drawImage(img, 0, 0, w, h);
+          const isPng = (file.type === "image/png") || (file.type === "image/webp");
+          resolve(cv.toDataURL(isPng ? "image/png" : "image/jpeg", quality));
+        };
+        img.src = rd.result;
+      };
+      rd.readAsDataURL(file);
+    });
+  }
 
   /* ---------- 积分 / 宠物 ---------- */
   function addCoins(n) { state.coins += n; state.petXp += n; updatePet(); save(); }
@@ -357,13 +386,11 @@
     $("#pick-photo").addEventListener("click", () => $("#photo-file").click());
     $("#photo-file").addEventListener("change", e => {
       const f = e.target.files[0]; if (!f) return;
-      const rd = new FileReader();
-      rd.onload = ev => {
-        r.photo = ev.target.result; save();
+      compressImage(f).then(dataUrl => {
+        r.photo = dataUrl; save();
         $(".rs-photo-wrap").innerHTML = `<img class="rs-photo" src="${r.photo}" alt="">`;
-        toast("照片已添加 📸");
-      };
-      rd.readAsDataURL(f);
+        toast("📸 照片已存入本机" + (getToken() ? "，并已同步云端" : "（想永久不丢请点☁云同步）"));
+      }).catch(() => { toast("照片读取失败，请重试"); });
     });
     $("#add-ing").addEventListener("click", () => { r.ingredients.push(""); save(); renderRecipe(); });
     $("#add-step").addEventListener("click", () => { r.steps.push(""); save(); renderRecipe(); });
@@ -455,13 +482,11 @@
       inp.addEventListener("change", e => {
         const f = e.target.files[0]; if (!f) return;
         const name = inp.dataset.name;
-        const rd = new FileReader();
-        rd.onload = ev => {
-          state.knowPhotos[name] = ev.target.result; save();
-          toast("照片已保存 📸");
+        compressImage(f).then(dataUrl => {
+          state.knowPhotos[name] = dataUrl; save();
+          toast("📸 照片已存入本机" + (getToken() ? "，并已同步云端" : "（想永久不丢请点☁云同步）"));
           renderKnowCards(group);
-        };
-        rd.readAsDataURL(f);
+        }).catch(() => toast("照片读取失败，请重试"));
       });
     }
     $$(".know-up-btn, .know-change").forEach(b =>
