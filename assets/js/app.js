@@ -168,23 +168,25 @@
   }
   function esc(s) { return (s || "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
 
-  /* 压缩图片：避免大图撑爆 localStorage（约 5MB 上限）导致保存失败、照片丢失 */
+  /* 读取图片：先压缩（防爆配额），如浏览器无法解码（HEIC 等）则原样保存，绝不丢失 */
   function compressImage(file, maxW, quality) {
     maxW = maxW || 1100; quality = quality || 0.76;
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const rd = new FileReader();
-      rd.onerror = reject;
+      rd.onerror = () => resolve(null);
       rd.onload = () => {
         const img = new Image();
-        img.onerror = reject;
+        img.onerror = () => resolve(rd.result); // fallback 原图 dataURL
         img.onload = () => {
-          let { width: w, height: h } = img;
-          if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
-          const cv = document.createElement("canvas");
-          cv.width = w; cv.height = h;
-          cv.getContext("2d").drawImage(img, 0, 0, w, h);
-          const isPng = (file.type === "image/png") || (file.type === "image/webp");
-          resolve(cv.toDataURL(isPng ? "image/png" : "image/jpeg", quality));
+          try {
+            let { width: w, height: h } = img;
+            if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+            const cv = document.createElement("canvas");
+            cv.width = w; cv.height = h;
+            cv.getContext("2d").drawImage(img, 0, 0, w, h);
+            const isPng = (file.type === "image/png") || (file.type === "image/webp");
+            resolve(cv.toDataURL(isPng ? "image/png" : "image/jpeg", quality));
+          } catch (e) { resolve(rd.result); }
         };
         img.src = rd.result;
       };
@@ -387,10 +389,11 @@
     $("#photo-file").addEventListener("change", e => {
       const f = e.target.files[0]; if (!f) return;
       compressImage(f).then(dataUrl => {
+        if (!dataUrl) { toast("照片读取失败，请换张试试"); return; }
         r.photo = dataUrl; save();
         $(".rs-photo-wrap").innerHTML = `<img class="rs-photo" src="${r.photo}" alt="">`;
         toast("📸 照片已存入本机" + (getToken() ? "，并已同步云端" : "（想永久不丢请点☁云同步）"));
-      }).catch(() => { toast("照片读取失败，请重试"); });
+      });
     });
     $("#add-ing").addEventListener("click", () => { r.ingredients.push(""); save(); renderRecipe(); });
     $("#add-step").addEventListener("click", () => { r.steps.push(""); save(); renderRecipe(); });
@@ -483,10 +486,11 @@
         const f = e.target.files[0]; if (!f) return;
         const name = inp.dataset.name;
         compressImage(f).then(dataUrl => {
+          if (!dataUrl) { toast("照片读取失败，请换张试试"); return; }
           state.knowPhotos[name] = dataUrl; save();
           toast("📸 照片已存入本机" + (getToken() ? "，并已同步云端" : "（想永久不丢请点☁云同步）"));
           renderKnowCards(group);
-        }).catch(() => toast("照片读取失败，请重试"));
+        });
       });
     }
     $$(".know-up-btn, .know-change").forEach(b =>
@@ -554,6 +558,12 @@
   /* ---------- 云同步设置弹层 ---------- */
   function openCloud() { $("#cloud-modal").hidden = false; refreshCloudUI(); }
   function closeCloud() { $("#cloud-modal").hidden = true; }
+  function updateCloudState() {
+    const el = $("#cloud-state"); if (!el) return;
+    const ok = !!getToken();
+    el.classList.toggle("ok", ok);
+    el.title = ok ? (getAuto() ? "已开启云端自动同步 ✅" : "已连接云端 ✅（建议开自动同步）") : "未连云端 ❌（刷新/换设备可能丢失，点此设置）";
+  }
   function refreshCloudUI() {
     $("#cloud-token").value = getToken();
     $("#cloud-auto").checked = getAuto();
@@ -563,8 +573,10 @@
     $("#cloud-hint").textContent = getAuto()
       ? "自动同步：开（每次改动后自动备份）"
       : "自动同步：关（请手动点「保存到云端」）";
+    updateCloudState();
   }
   $("#cloud-btn").addEventListener("click", () => { $("#sidebar").classList.remove("open"); openCloud(); });
+  $("#cloud-state").addEventListener("click", openCloud);
   $("#cloud-cancel").addEventListener("click", closeCloud);
   $("#cloud-modal").addEventListener("click", e => { if (e.target.id === "cloud-modal") closeCloud(); });
   $("#cloud-auto").addEventListener("change", e => setAuto(e.target.checked));
@@ -584,10 +596,11 @@
   /* ---------- 启动 ---------- */
   renderHome();
   updatePet();
+  updateCloudState();
   showView("home");
   snow();
   // 本地为空时自动从云端恢复（跨设备/清缓存不丢）
   if (!state.recipes || Object.keys(state.recipes).length === 0) {
-    loadFromCloud(false).then(ok => { if (ok) { renderHome(); updatePet(); } });
+    loadFromCloud(false).then(ok => { if (ok) { renderHome(); updatePet(); updateCloudState(); } });
   }
 })();
